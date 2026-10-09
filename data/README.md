@@ -1,0 +1,1 @@
+Place Excel (.xlsx, .xls, .xlsm) or CSV sales files in this folder.
