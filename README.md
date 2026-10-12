@@ -13,7 +13,7 @@ A local LangChain application that reads Excel and CSV sales files, calculates s
 	pip install -r requirements.txt
 	```
 
-3. Put `.xlsx`, `.xls`, `.xlsm`, or `.csv` sales files in `data/`.
+3. Optionally put `.xlsx`, `.xls`, `.xlsm`, or `.csv` sales files in `data/` to load them automatically.
 4. Edit `.env` to select and configure a model. The OpenRouter key belongs only in `OPENROUTER_API_KEY` in this ignored local file.
 
 ## Run the app
@@ -22,7 +22,7 @@ A local LangChain application that reads Excel and CSV sales files, calculates s
 streamlit run app.py
 ```
 
-The app previews loaded rows, suggests date and sales amount columns, lets you adjust the mappings, and saves a report when you submit. If your files use different headers, select the matching columns in the form.
+The app lets you upload one or more `.xlsx`, `.xls`, or `.csv` sales reports, extracts their rows, and previews the loaded data. Uploaded files take precedence over files in `data/`; if no files are uploaded, the app loads from that folder. It suggests date and sales amount columns, lets you adjust the mappings, and saves a report when you submit. If your files use different headers, select the matching columns in the form.
 
 For Ollama, start Ollama and download the configured model first, for example:
 

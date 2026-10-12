@@ -4,7 +4,9 @@ from __future__ import annotations
 
 import os
 import re
+from collections.abc import Iterable
 from datetime import date
+from io import BytesIO
 from pathlib import Path
 from typing import Any
 
@@ -40,29 +42,50 @@ def load_sales_data(directory: Path = DATA_DIR) -> pd.DataFrame:
     for path in sorted(directory.iterdir()):
         if path.name.startswith("~$") or path.suffix.lower() not in SUPPORTED_EXTENSIONS:
             continue
-        try:
-            if path.suffix.lower() == ".csv":
-                sheets = {"CSV": pd.read_csv(path)}
-            else:
-                sheets = pd.read_excel(path, sheet_name=None)
-        except Exception as exc:
-            raise ValueError(f"Could not read {path.name}: {exc}") from exc
-
-        for sheet_name, frame in sheets.items():
-            if frame.empty or len(frame.columns) == 0:
-                continue
-            frame = frame.dropna(how="all").copy()
-            if frame.empty:
-                continue
-            frame["_source_file"] = path.name
-            frame["_source_sheet"] = str(sheet_name)
-            frames.append(frame)
+        frames.extend(_read_sales_file(path.name, path))
 
     if not frames:
         raise FileNotFoundError(
             f"No usable Excel or CSV files found in {directory.name}/."
         )
     return pd.concat(frames, ignore_index=True, sort=False)
+
+
+def load_sales_uploads(files: Iterable[tuple[str, bytes]]) -> pd.DataFrame:
+    """Read uploaded sales spreadsheets and CSV files."""
+    frames: list[pd.DataFrame] = []
+    for name, content in files:
+        suffix = Path(name).suffix.lower()
+        if suffix not in SUPPORTED_EXTENSIONS:
+            raise ValueError(f"Unsupported sales file type: {name}")
+        frames.extend(_read_sales_file(name, BytesIO(content)))
+
+    if not frames:
+        raise ValueError("The uploaded files do not contain any usable sales data.")
+    return pd.concat(frames, ignore_index=True, sort=False)
+
+
+def _read_sales_file(name: str, source: Path | BytesIO) -> list[pd.DataFrame]:
+    suffix = Path(name).suffix.lower()
+    try:
+        if suffix == ".csv":
+            sheets = {"CSV": pd.read_csv(source)}
+        else:
+            sheets = pd.read_excel(source, sheet_name=None)
+    except Exception as exc:
+        raise ValueError(f"Could not read {name}: {exc}") from exc
+
+    frames: list[pd.DataFrame] = []
+    for sheet_name, frame in sheets.items():
+        if frame.empty or len(frame.columns) == 0:
+            continue
+        frame = frame.dropna(how="all").copy()
+        if frame.empty:
+            continue
+        frame["_source_file"] = name
+        frame["_source_sheet"] = str(sheet_name)
+        frames.append(frame)
+    return frames
 
 
 def _normalize_name(value: Any) -> str:
@@ -104,7 +127,7 @@ def _llm_narrative(metrics: dict[str, Any], provider: str) -> tuple[str, str | N
             from langchain_openai import ChatOpenAI
 
             model = ChatOpenAI(
-                model=os.getenv("OPENROUTER_MODEL", "openai/gpt-4o-mini"),
+                model=os.getenv("OPENROUTER_MODEL", "nvidia/nemotron-3-ultra-550b-a55b:free"),
                 api_key=api_key,
                 base_url="https://openrouter.ai/api/v1",
                 temperature=0.2,

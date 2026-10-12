@@ -5,13 +5,19 @@ import os
 import streamlit as st
 from dotenv import load_dotenv
 
-from sales_reporter import DATA_DIR, detect_columns, generate_report, load_sales_data
+from sales_reporter import (
+    DATA_DIR,
+    detect_columns,
+    generate_report,
+    load_sales_data,
+    load_sales_uploads,
+)
 
 
 load_dotenv()
 st.set_page_config(page_title="Daily Sales Report", page_icon="Sales", layout="wide")
 st.title("Daily Sales Report")
-st.caption("Sales files are read from the local data/ folder. Reports are saved in reports/.")
+st.caption("Upload a sales report to extract and preview its data. Reports are saved in reports/.")
 
 provider_default = os.getenv("LLM_PROVIDER", "ollama").lower()
 provider = st.selectbox(
@@ -20,10 +26,31 @@ provider = st.selectbox(
     index=0 if provider_default != "openrouter" else 1,
 )
 
-try:
-    frame = load_sales_data(DATA_DIR)
-except (FileNotFoundError, ValueError) as exc:
-    st.warning(str(exc))
+uploaded_files = st.file_uploader(
+    "Upload sales reports",
+    type=["csv", "xls", "xlsx"],
+    accept_multiple_files=True,
+    help="Upload one or more CSV or Excel sales reports.",
+)
+
+if uploaded_files:
+    try:
+        frame = load_sales_uploads(
+            (uploaded_file.name, uploaded_file.getvalue())
+            for uploaded_file in uploaded_files
+        )
+    except ValueError as exc:
+        st.error(str(exc))
+        st.stop()
+else:
+    try:
+        frame = load_sales_data(DATA_DIR)
+    except (FileNotFoundError, ValueError) as exc:
+        st.info(f"{exc} Upload a sales report above or add a file to data/.")
+        st.stop()
+
+if frame.empty:
+    st.warning("The selected sales data is empty.")
     st.stop()
 
 st.caption(f"Loaded {len(frame):,} rows across {frame['_source_file'].nunique()} file(s).")
